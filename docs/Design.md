@@ -320,35 +320,283 @@ stateDiagram-v2
     note right of Running: Polling for updates
 ```
 
-## Leader Election and High Availability
+## Submitting FunctionSpecs for Job Processing
+
+The `ColonyProcess` CRD enables submitting any type of job to ColonyOS executors. This provides a Kubernetes-native way to leverage distributed compute resources managed by ColonyOS.
+
+### Use Cases
 
 ```mermaid
-flowchart TB
-    subgraph Pod1[Pod: kolony-controller-0]
-        C1[Controller]
-        L1[Leader Election]
+flowchart LR
+    subgraph Jobs[Job Types]
+        ML[ML Training]
+        ETL[Data Processing]
+        Render[3D Rendering]
+        Sim[Simulations]
+        Build[CI/CD Builds]
     end
 
-    subgraph Pod2[Pod: kolony-controller-1]
-        C2[Controller]
-        L2[Leader Election]
+    subgraph K8s[Kubernetes]
+        CR[ColonyProcess CR]
     end
 
-    subgraph Pod3[Pod: kolony-controller-2]
-        C3[Controller]
-        L3[Leader Election]
+    subgraph ColonyOS
+        Queue[Process Queue]
+        Exec[Distributed Executors]
     end
 
-    Lease[Lease: kolony-leader]
-
-    L1 -->|acquire| Lease
-    L2 -.->|standby| Lease
-    L3 -.->|standby| Lease
-
-    C1 -->|active| Reconcile[Reconciliation]
-    C2 -.->|inactive| Reconcile
-    C3 -.->|inactive| Reconcile
+    Jobs --> CR
+    CR --> Queue
+    Queue --> Exec
 ```
+
+### FunctionSpec Mapping
+
+The ColonyProcess spec maps directly to a ColonyOS FunctionSpec:
+
+```yaml
+apiVersion: colonyos.io/v1
+kind: ColonyProcess
+metadata:
+  name: training-job-001
+  namespace: ml-team
+spec:
+  # Function identification
+  funcName: train-model
+  executorType: gpu-executor
+
+  # Arguments
+  args:
+    - "--epochs=100"
+    - "--batch-size=32"
+
+  # Keyword arguments (arbitrary key-value pairs)
+  kwargs:
+    model: resnet50
+    dataset: s3://datasets/imagenet
+    outputPath: s3://models/resnet50-v2
+    hyperparameters:
+      learningRate: 0.001
+      optimizer: adam
+
+  # Resource requirements
+  conditions:
+    colonyName: ml-prod
+    executorType: gpu-executor
+    nodes: 4
+    cpu: 8
+    memory: 64000      # MB
+    gpu:
+      count: 2
+      name: nvidia-a100
+
+  # Timing constraints
+  maxWaitTime: 3600    # Max time in queue (seconds)
+  maxExecTime: 86400   # Max execution time (seconds)
+  maxRetries: 3
+
+  # Environment
+  env:
+    CUDA_VISIBLE_DEVICES: "0,1"
+    WANDB_API_KEY:
+      secretKeyRef:
+        name: wandb-credentials
+        key: api-key
+
+status:
+  processId: "abc123..."
+  state: RUNNING
+  assignedExecutor: gpu-node-7
+  assignedAt: "2026-01-03T10:00:00Z"
+  startTime: "2026-01-03T10:00:05Z"
+  completionTime: null
+  retries: 0
+  output: []
+  errors: []
+```
+
+### Job Patterns
+
+#### One-Shot Job
+
+Submit a single process and wait for completion:
+
+```yaml
+apiVersion: colonyos.io/v1
+kind: ColonyProcess
+metadata:
+  name: data-export-$(date +%s)
+spec:
+  funcName: export-data
+  executorType: etl-executor
+  kwargs:
+    source: postgres://db/analytics
+    destination: s3://exports/daily/
+    format: parquet
+```
+
+#### Batch Processing with Job Arrays
+
+Use Kubernetes Job or a workflow engine to create multiple ColonyProcess resources:
+
+```yaml
+# Template for batch processing
+apiVersion: colonyos.io/v1
+kind: ColonyProcess
+metadata:
+  name: render-frame-${FRAME_NUMBER}
+spec:
+  funcName: render
+  executorType: render-executor
+  kwargs:
+    scene: s3://assets/scene.blend
+    frame: ${FRAME_NUMBER}
+    output: s3://renders/frame-${FRAME_NUMBER}.png
+```
+
+#### Long-Running Services
+
+For persistent services, use a Blueprint instead. ColonyProcess is designed for finite jobs.
+
+### Controller Behavior
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant K8s as Kubernetes
+    participant Ctrl as Kolony Controller
+    participant CO as ColonyOS
+
+    User->>K8s: Create ColonyProcess CR
+
+    Ctrl->>K8s: Watch event received
+    Ctrl->>Ctrl: Add finalizer
+    Ctrl->>CO: Submit FunctionSpec
+    CO-->>Ctrl: processId
+    Ctrl->>K8s: Update status (processId, state=WAITING)
+
+    loop Poll until complete
+        Ctrl->>CO: Get process status
+        CO-->>Ctrl: Current state
+        Ctrl->>K8s: Update status
+    end
+
+    alt Success
+        Ctrl->>K8s: Set state=SUCCESS, store output
+    else Failure
+        Ctrl->>K8s: Set state=FAILED, store errors
+    end
+
+    Note over User,CO: On delete while RUNNING:
+    User->>K8s: Delete ColonyProcess CR
+    Ctrl->>CO: Close process (cancel)
+    Ctrl->>K8s: Remove finalizer
+```
+
+### Environment Variables from Secrets
+
+Sensitive values can be injected from Kubernetes Secrets:
+
+```yaml
+spec:
+  env:
+    # Direct value
+    LOG_LEVEL: debug
+
+    # From Secret
+    DATABASE_PASSWORD:
+      secretKeyRef:
+        name: db-credentials
+        key: password
+
+    # From ConfigMap
+    CONFIG_FILE:
+      configMapKeyRef:
+        name: app-config
+        key: config.yaml
+```
+
+The controller resolves these references before submitting to ColonyOS.
+
+### Output and Artifacts
+
+Process output is captured in the status:
+
+```yaml
+status:
+  state: SUCCESS
+  output:
+    - "Training complete"
+    - "Accuracy: 0.9542"
+    - "Model saved to s3://models/resnet50-v2/model.pt"
+  artifacts:
+    model: s3://models/resnet50-v2/model.pt
+    metrics: s3://models/resnet50-v2/metrics.json
+    logs: s3://logs/training-job-001.log
+```
+
+### Integration with Argo Workflows
+
+ColonyProcess resources can be created by Argo Workflows for complex pipelines:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: ml-pipeline
+spec:
+  entrypoint: train-and-deploy
+  templates:
+    - name: train-and-deploy
+      dag:
+        tasks:
+          - name: preprocess
+            template: colony-job
+            arguments:
+              parameters:
+                - name: funcName
+                  value: preprocess
+
+          - name: train
+            dependencies: [preprocess]
+            template: colony-job
+            arguments:
+              parameters:
+                - name: funcName
+                  value: train
+
+    - name: colony-job
+      inputs:
+        parameters:
+          - name: funcName
+      resource:
+        action: create
+        successCondition: status.state == SUCCESS
+        failureCondition: status.state == FAILED
+        manifest: |
+          apiVersion: colonyos.io/v1
+          kind: ColonyProcess
+          metadata:
+            generateName: {{inputs.parameters.funcName}}-
+          spec:
+            funcName: {{inputs.parameters.funcName}}
+            executorType: ml-executor
+```
+
+Argo handles DAG orchestration while ColonyOS handles distributed execution across any infrastructure.
+
+## Leader Election and High Availability
+
+Leader election is handled automatically by the Kubernetes `coordination.k8s.io/v1` Lease API. When using controller-runtime, it's a simple configuration option:
+
+```go
+mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+    LeaderElection:   true,
+    LeaderElectionID: "kolony-leader.colonyos.io",
+})
+```
+
+The framework handles lease acquisition, renewal, graceful handover, and automatic failover. Multiple replicas can run for high availability - only the leader actively reconciles.
 
 ## Error Handling and Retry
 
