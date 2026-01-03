@@ -1,0 +1,28 @@
+# Container Executor ColonyProcess Example
+#
+# Submits a job to be executed by a container-executor.
+# The container-executor runs containerized workloads via Docker.
+#
+apiVersion: colony.colonyos.io/v1
+kind: ColonyProcess
+metadata:
+  name: container-hello
+  namespace: default
+spec:
+  funcName: execute
+  executorType: container-executor
+
+  kwargs:
+    # Docker image to run
+    docker-image: alpine:latest
+    # Command to execute (as a single string)
+    cmd: "/bin/sh -c 'echo Hello from container executor && date && hostname'"
+
+  # Resource conditions
+  conditions:
+    # Number of processes per node (required by container-executor)
+    processesPerNode: 1
+
+  # Timing constraints
+  maxWaitTime: 300
+  maxExecTime: 600

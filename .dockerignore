@@ -1,0 +1,26 @@
+# Ignore build outputs
+bin/
+testbin/
+cover.out
+
+# Ignore version control
+.git
+.gitignore
+
+# Ignore IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ignore test files
+*_test.go
+
+# Ignore docs
+docs/
+*.md
+LICENSE
+
+# Ignore CI/CD
+.github/
+.devcontainer/

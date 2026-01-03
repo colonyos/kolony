@@ -1,0 +1,25 @@
+# Blueprint for ETL Worker Deployment
+#
+# This creates an instance of ExecutorDeployment for data processing workloads.
+#
+apiVersion: colony.colonyos.io/v1
+kind: Blueprint
+metadata:
+  name: etl-workers
+  namespace: default
+spec:
+  kind: ExecutorDeployment
+  data:
+    name: etl-executor
+    image: colonyos/etl-executor:v2.1
+    replicas: 10
+    resources:
+      cpu: "2"
+      memory: "8Gi"
+    env:
+      SPARK_DRIVER_MEMORY: "4g"
+      SPARK_EXECUTOR_MEMORY: "4g"
+    volumes:
+      - name: data-cache
+        emptyDir:
+          sizeLimit: "50Gi"

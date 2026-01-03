@@ -1,0 +1,18 @@
+# Simple ColonyProcess Example
+#
+# Submits a basic function to ColonyOS and tracks its execution.
+# This is the simplest form of a ColonyProcess.
+#
+apiVersion: colony.colonyos.io/v1
+kind: ColonyProcess
+metadata:
+  name: hello-world
+  namespace: default
+spec:
+  # Function name to execute
+  funcName: hello
+  # Type of executor to run this function
+  executorType: cli
+  # Positional arguments
+  args:
+    - "Hello from Kubernetes!"

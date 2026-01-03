@@ -1,0 +1,25 @@
+# BlueprintDefinition for ExecutorDeployment
+#
+# This defines a schema for deploying executor instances via the docker-reconciler.
+# Once created, you can create Blueprint resources of kind "ExecutorDeployment".
+#
+apiVersion: colony.colonyos.io/v1
+kind: BlueprintDefinition
+metadata:
+  name: executor-deployment-def
+  namespace: default
+spec:
+  # The kind that Blueprints will use to reference this definition
+  kind: ExecutorDeployment
+  # Naming conventions
+  names:
+    singular: executordeployment
+    plural: executordeployments
+  # Handler configuration
+  handler:
+    # Which executor type handles reconciliation
+    executorType: docker-reconciler
+    # Function name to call for reconciliation
+    functionName: reconcile
+    # How often to reconcile (in seconds)
+    reconcileInterval: 60

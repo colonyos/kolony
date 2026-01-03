@@ -1,0 +1,9 @@
+apiVersion: colony.colonyos.io/v1
+kind: BlueprintDefinition
+metadata:
+  labels:
+    app.kubernetes.io/name: kolony
+    app.kubernetes.io/managed-by: kustomize
+  name: blueprintdefinition-sample
+spec:
+  # TODO(user): Add fields here

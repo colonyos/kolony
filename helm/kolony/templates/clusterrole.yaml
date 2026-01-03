@@ -1,0 +1,65 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kolony.fullname" . }}-manager-role
+  labels:
+    {{- include "kolony.labels" . | nindent 4 }}
+rules:
+  # Core resources
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+  # BlueprintDefinitions
+  - apiGroups: ["colony.colonyos.io"]
+    resources: ["blueprintdefinitions"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["colony.colonyos.io"]
+    resources: ["blueprintdefinitions/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["colony.colonyos.io"]
+    resources: ["blueprintdefinitions/finalizers"]
+    verbs: ["update"]
+
+  # Blueprints
+  - apiGroups: ["colony.colonyos.io"]
+    resources: ["blueprints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["colony.colonyos.io"]
+    resources: ["blueprints/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["colony.colonyos.io"]
+    resources: ["blueprints/finalizers"]
+    verbs: ["update"]
+
+  # ColonyProcesses
+  - apiGroups: ["colony.colonyos.io"]
+    resources: ["colonyprocesses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["colony.colonyos.io"]
+    resources: ["colonyprocesses/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["colony.colonyos.io"]
+    resources: ["colonyprocesses/finalizers"]
+    verbs: ["update"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kolony.fullname" . }}-leader-election-role
+  labels:
+    {{- include "kolony.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]

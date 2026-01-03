@@ -1,0 +1,19 @@
+# BlueprintDefinition for GPUCluster
+#
+# This defines a schema for managing GPU compute clusters.
+# Useful for ML training workloads that require GPU resources.
+#
+apiVersion: colony.colonyos.io/v1
+kind: BlueprintDefinition
+metadata:
+  name: gpu-cluster-def
+  namespace: default
+spec:
+  kind: GPUCluster
+  names:
+    singular: gpucluster
+    plural: gpuclusters
+  handler:
+    executorType: k8s-reconciler
+    functionName: reconcile_gpu_cluster
+    reconcileInterval: 120

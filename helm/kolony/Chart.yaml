@@ -1,0 +1,14 @@
+apiVersion: v2
+name: kolony
+description: A Kubernetes operator for managing ColonyOS resources
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - colonyos
+  - operator
+  - distributed-computing
+maintainers:
+  - name: ColonyOS Team
+sources:
+  - https://github.com/colonyos/kolony

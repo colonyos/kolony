@@ -1,0 +1,6 @@
+## Append samples of your project ##
+resources:
+- colony_v1_blueprintdefinition.yaml
+- colony_v1_blueprint.yaml
+- colony_v1_colonyprocess.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

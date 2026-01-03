@@ -1,0 +1,25 @@
+# Blueprint for LLM Executor Deployment
+#
+# This creates an instance of ExecutorDeployment to run LLM inference executors.
+# Requires the executor-deployment-def BlueprintDefinition to be created first.
+#
+apiVersion: colony.colonyos.io/v1
+kind: Blueprint
+metadata:
+  name: llm-executor
+  namespace: default
+spec:
+  # References the BlueprintDefinition kind
+  kind: ExecutorDeployment
+  # Arbitrary specification data - interpreted by the reconciler
+  data:
+    name: llm-executor
+    image: colonyos/llm-executor:latest
+    replicas: 3
+    resources:
+      cpu: "4"
+      memory: "16Gi"
+      gpu: 1
+    env:
+      MODEL_NAME: "llama-7b"
+      MAX_BATCH_SIZE: "8"
