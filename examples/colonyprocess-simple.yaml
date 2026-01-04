@@ -1,18 +1,22 @@
 # Simple ColonyProcess Example
 #
 # Submits a basic function to ColonyOS and tracks its execution.
-# This is the simplest form of a ColonyProcess.
+# Uses container-executor to run a simple echo command in a container.
 #
 apiVersion: colony.colonyos.io/v1
 kind: ColonyProcess
 metadata:
-  name: hello-world
+  generateName: hello-world-
   namespace: default
 spec:
-  # Function name to execute
-  funcName: hello
+  # Function name for container-executor
+  funcName: execute
   # Type of executor to run this function
-  executorType: cli
-  # Positional arguments
-  args:
-    - "Hello from Kubernetes!"
+  executorType: container-executor
+  # Container configuration
+  kwargs:
+    docker-image: alpine:latest
+    cmd: "echo 'Hello from Kubernetes via ColonyOS!'"
+  # Timing constraints
+  maxWaitTime: 300
+  maxExecTime: 60

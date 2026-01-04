@@ -3,10 +3,13 @@
 # Submits a job to be executed by a container-executor.
 # The container-executor runs containerized workloads via Docker.
 #
+# Uses generateName to create unique process names on each apply.
+# Each "kubectl create -f" creates a new process like "container-hello-abc12"
+#
 apiVersion: colony.colonyos.io/v1
 kind: ColonyProcess
 metadata:
-  name: container-hello
+  generateName: container-hello-
   namespace: default
 spec:
   funcName: execute

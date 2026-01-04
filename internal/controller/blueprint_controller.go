@@ -194,7 +194,7 @@ func (r *BlueprintReconciler) getColoniesClient(ctx context.Context, namespace s
 
 	host := string(secret.Data["serverHost"])
 	port := parsePort(string(secret.Data["serverPort"]))
-	tls := string(secret.Data["tls"]) == "true"
+	tls := string(secret.Data["tls"]) == tlsEnabledValue
 	executorPrvKey := string(secret.Data["executorPrvKey"])
 	colonyName := string(secret.Data["colonyName"])
 

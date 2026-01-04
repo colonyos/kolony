@@ -39,6 +39,7 @@ import (
 const (
 	blueprintDefinitionFinalizer = "colony.colonyos.io/blueprintdefinition-finalizer"
 	credentialsSecretName        = "colonyos-credentials"
+	tlsEnabledValue              = "true"
 )
 
 // BlueprintDefinitionReconciler reconciles a BlueprintDefinition object
@@ -182,7 +183,7 @@ func (r *BlueprintDefinitionReconciler) getColoniesClient(ctx context.Context, n
 
 	host := string(secret.Data["serverHost"])
 	port := parsePort(string(secret.Data["serverPort"]))
-	tls := string(secret.Data["tls"]) == "true"
+	tls := string(secret.Data["tls"]) == tlsEnabledValue
 	colonyPrvKey := string(secret.Data["colonyPrvKey"])
 
 	// CreateColoniesClient(host, port, insecure, skipTLSVerify)

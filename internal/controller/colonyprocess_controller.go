@@ -290,7 +290,8 @@ func (r *ColonyProcessReconciler) pollProcessStatus(ctx context.Context, proc *c
 	}
 
 	// Set appropriate conditions
-	if newState == colonyv1.ProcessStateRunning {
+	switch newState {
+	case colonyv1.ProcessStateRunning:
 		meta.SetStatusCondition(&proc.Status.Conditions, metav1.Condition{
 			Type:               "Running",
 			Status:             metav1.ConditionTrue,
@@ -298,7 +299,7 @@ func (r *ColonyProcessReconciler) pollProcessStatus(ctx context.Context, proc *c
 			Message:            fmt.Sprintf("Process running on executor %s", result.AssignedExecutorID),
 			LastTransitionTime: metav1.Now(),
 		})
-	} else if newState == colonyv1.ProcessStateSuccess {
+	case colonyv1.ProcessStateSuccess:
 		meta.SetStatusCondition(&proc.Status.Conditions, metav1.Condition{
 			Type:               "Complete",
 			Status:             metav1.ConditionTrue,
@@ -306,7 +307,7 @@ func (r *ColonyProcessReconciler) pollProcessStatus(ctx context.Context, proc *c
 			Message:            "Process completed successfully",
 			LastTransitionTime: metav1.Now(),
 		})
-	} else if newState == colonyv1.ProcessStateFailed {
+	case colonyv1.ProcessStateFailed:
 		errMsg := "Process failed"
 		if len(result.Errors) > 0 {
 			errMsg = result.Errors[0]
@@ -349,7 +350,7 @@ func (r *ColonyProcessReconciler) getColoniesClient(ctx context.Context, namespa
 
 	host := string(secret.Data["serverHost"])
 	port := parsePort(string(secret.Data["serverPort"]))
-	tls := string(secret.Data["tls"]) == "true"
+	tls := string(secret.Data["tls"]) == tlsEnabledValue
 	executorPrvKey := string(secret.Data["executorPrvKey"])
 	colonyName := string(secret.Data["colonyName"])
 
