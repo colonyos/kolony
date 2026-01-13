@@ -1,0 +1,17 @@
+apiVersion: colony.colonyos.io/v1
+kind: Blueprint
+metadata:
+  name: echoexecutor-apple
+  namespace: default
+spec:
+  kind: ExecutorDeployment
+  locationName: apple_ultra
+  data:
+    executorType: echo-executor
+    image: colonyos/echoexecutor:v1.0.8
+    replicas: 1
+    env:
+      EXECUTOR_TYPE: echo-executor
+      EXECUTOR_HW_PLATFORM: darwin
+      EXECUTOR_HW_ARCHITECTURE: arm64
+      EXECUTOR_LOCATION_DESC: Echo Executor on Apple Ultra

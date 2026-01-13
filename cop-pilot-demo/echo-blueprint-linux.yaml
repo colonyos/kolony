@@ -1,0 +1,17 @@
+apiVersion: colony.colonyos.io/v1
+kind: Blueprint
+metadata:
+  name: echoexecutor-linux
+  namespace: default
+spec:
+  kind: ExecutorDeployment
+  locationName: home_linux_server
+  data:
+    executorType: echo-executor
+    image: colonyos/echoexecutor:v1.0.8
+    replicas: 1
+    env:
+      EXECUTOR_TYPE: echo-executor
+      EXECUTOR_HW_PLATFORM: linux
+      EXECUTOR_HW_ARCHITECTURE: amd64
+      EXECUTOR_LOCATION_DESC: Echo Executor on Linux Server
