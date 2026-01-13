@@ -17,13 +17,17 @@ This allows operators to deploy and manage workloads across an entire mining ope
 
 ```mermaid
 flowchart TB
-    subgraph Cloud["Cloud / Data Center"]
+    subgraph DomainOrch["DomainOrch Data Center"]
         subgraph OpenSlice["OpenSlice (TMF Open APIs)"]
             ServiceCatalog["Service Catalog"]
             ServiceOrder["Service Order Management"]
             ServiceInventory["Service Inventory"]
         end
+    end
 
+    Internet1{{"Internet / WAN"}}
+
+    subgraph MineDataCenter["Mine Data Center"]
         subgraph Kubernetes["Kubernetes Cluster"]
             subgraph ColoniesCluster["ColonyOS Server Cluster"]
                 Server1["colonies-server-0"]
@@ -41,7 +45,7 @@ flowchart TB
         end
     end
 
-    Internet{{"Internet / WAN"}}
+    Internet2{{"Internet / WAN"}}
 
     subgraph Site1["Mining Site - Surface Control Room"]
         subgraph LinuxServer["linux-server (Edge Server)"]
@@ -57,16 +61,16 @@ flowchart TB
         end
     end
 
-    ServiceOrder -->|"Create Order"| ServiceCatalog
-    ServiceCatalog -->|"kubectl apply"| BlueprintCRD
+    OpenSlice <-->|"HTTPS"| Internet1
+    Internet1 <-->|"kubectl apply"| BlueprintCRD
     BlueprintCRD --> Controller
     Controller -->|"Sync Blueprint"| ColoniesCluster
     ColoniesCluster --> etcd
     ColoniesCluster --> TimescaleDB
 
-    ColoniesCluster <-->|"HTTPS"| Internet
-    Internet <-->|"Pull Work"| Reconciler1
-    Internet <-->|"Pull Work"| Reconciler2
+    ColoniesCluster <-->|"HTTPS"| Internet2
+    Internet2 <-->|"Pull Work"| Reconciler1
+    Internet2 <-->|"Pull Work"| Reconciler2
 
     Reconciler1 -->|"Deploy"| Container1
     Reconciler2 -->|"Deploy"| Container2
