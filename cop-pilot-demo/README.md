@@ -17,7 +17,7 @@ This allows operators to deploy and manage workloads across an entire mining ope
 
 ```mermaid
 flowchart TB
-    subgraph DomainOrch["DomainOrch Data Center"]
+    subgraph DomainOrch["DomainOrch"]
         subgraph OpenSlice["OpenSlice (TMF Open APIs)"]
             ServiceCatalog["Service Catalog"]
             ServiceOrder["Service Order Management"]
@@ -76,6 +76,19 @@ flowchart TB
     Reconciler2 -->|"Deploy"| Container2
     Container1 -->|"Register"| Reconciler1
     Container2 -->|"Register"| Reconciler2
+
+    style DomainOrch fill:#e1f5fe,stroke:#01579b
+    style OpenSlice fill:#b3e5fc,stroke:#0288d1
+    style MineDataCenter fill:#f3e5f5,stroke:#7b1fa2
+    style Kubernetes fill:#e1bee7,stroke:#8e24aa
+    style ColoniesCluster fill:#ce93d8,stroke:#9c27b0
+    style Kolony fill:#ce93d8,stroke:#9c27b0
+    style Site1 fill:#e8f5e9,stroke:#2e7d32
+    style Site2 fill:#fff3e0,stroke:#e65100
+    style LinuxServer fill:#c8e6c9,stroke:#388e3c
+    style AppleUltra fill:#ffe0b2,stroke:#f57c00
+    style Internet1 fill:#ffcdd2,stroke:#c62828
+    style Internet2 fill:#ffcdd2,stroke:#c62828
 ```
 
 ## Components
