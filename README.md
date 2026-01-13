@@ -13,7 +13,6 @@ Kubernetes has revolutionized how we manage cloud infrastructure through declara
 Through ColonyOS executors, Kolony can reconcile state across systems that cannot run Kubernetes themselves:
 
 - **IoT and Embedded Systems** - Sensors, PLCs, industrial controllers, and edge devices with limited compute resources
-- **High-Performance Computing** - HPC clusters running SLURM, PBS, or other batch schedulers that predate Kubernetes
 - **Legacy Infrastructure** - SCADA systems, proprietary hardware, and brownfield installations
 - **Remote and Harsh Environments** - Mining sites, offshore platforms, Arctic installations with intermittent connectivity
 - **Specialized Hardware** - GPUs, FPGAs, quantum computers, and domain-specific accelerators

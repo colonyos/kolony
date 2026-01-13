@@ -18,6 +18,9 @@ spec:
     - jsonPath: .spec.kind
       name: Kind
       type: string
+    - jsonPath: .spec.locationName
+      name: Location
+      type: string
     - jsonPath: .status.synced
       name: Synced
       type: boolean
@@ -59,6 +62,10 @@ spec:
                 x-kubernetes-preserve-unknown-fields: true
               kind:
                 description: Kind is the type of blueprint (must match a BlueprintDefinition)
+                type: string
+              locationName:
+                description: LocationName specifies which location/reconciler handles
+                  this blueprint
                 type: string
             required:
             - kind

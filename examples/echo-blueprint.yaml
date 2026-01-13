@@ -1,0 +1,35 @@
+# Echo Executor Blueprint Example
+#
+# Deploys the ColonyOS echo executor via docker-reconciler.
+# The executor echoes back its input - useful for testing.
+#
+# Prerequisites:
+# 1. Create the colonyos-credentials secret in your namespace
+# 2. Ensure the ExecutorDeployment BlueprintDefinition is registered
+# 3. Have a docker-reconciler running at the specified location
+#
+# Usage:
+#   kubectl apply -f echo-blueprint.yaml
+#   kubectl get blueprints
+#   kubectl delete -f echo-blueprint.yaml
+#
+apiVersion: colony.colonyos.io/v1
+kind: Blueprint
+metadata:
+  name: echoexecutor
+  namespace: default
+spec:
+  # Must match a registered BlueprintDefinition kind
+  kind: ExecutorDeployment
+  # Location determines which docker-reconciler handles this blueprint
+  locationName: home_linux_server
+  # Blueprint specification (passed to ColonyOS)
+  data:
+    executorType: echo-executor
+    image: colonyos/echoexecutor:v1.0.8
+    replicas: 1
+    env:
+      EXECUTOR_TYPE: echo-executor
+      EXECUTOR_HW_PLATFORM: linux
+      EXECUTOR_HW_ARCHITECTURE: amd64
+      EXECUTOR_LOCATION_DESC: Echo Executor

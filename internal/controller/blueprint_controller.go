@@ -109,7 +109,9 @@ func (r *BlueprintReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Build ColonyOS Blueprint
-	cosBp := core.CreateBlueprint(colonyName, bp.Name, bp.Spec.Kind)
+	// CreateBlueprint signature: (kind, name, namespace/colonyName)
+	cosBp := core.CreateBlueprint(bp.Spec.Kind, bp.Name, colonyName)
+	cosBp.Metadata.LocationName = bp.Spec.LocationName
 	cosBp.Spec = specData
 
 	var result *core.Blueprint

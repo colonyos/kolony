@@ -27,6 +27,10 @@ type BlueprintSpec struct {
 	// +kubebuilder:validation:Required
 	Kind string `json:"kind"`
 
+	// LocationName specifies which location/reconciler handles this blueprint
+	// +optional
+	LocationName string `json:"locationName,omitempty"`
+
 	// Data contains the blueprint specification as arbitrary key-value pairs
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
@@ -70,6 +74,7 @@ type BlueprintStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Kind",type=string,JSONPath=`.spec.kind`
+// +kubebuilder:printcolumn:name="Location",type=string,JSONPath=`.spec.locationName`
 // +kubebuilder:printcolumn:name="Synced",type=boolean,JSONPath=`.status.synced`
 // +kubebuilder:printcolumn:name="Generation",type=integer,JSONPath=`.status.generation`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
