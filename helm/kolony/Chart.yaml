@@ -2,8 +2,8 @@ apiVersion: v2
 name: kolony
 description: A Kubernetes operator for managing ColonyOS resources
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.1.1
+appVersion: "0.1.1"
 keywords:
   - colonyos
   - operator

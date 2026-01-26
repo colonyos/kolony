@@ -1,0 +1,34 @@
+# DataLogger BlueprintDefinition
+#
+# Defines the schema for DataLogger blueprints. The data-logger-reconciler
+# handles reconciliation of these blueprints, ensuring the actual state
+# of data logging devices matches the desired state.
+#
+# Prerequisites:
+# 1. Create the colonyos-credentials secret in your namespace
+# 2. Have a data-logger-reconciler running
+#
+# Usage:
+#   kubectl apply -f datalogger-definition.yaml
+#   kubectl get blueprintdefinitions
+#
+apiVersion: colony.colonyos.io/v1
+kind: BlueprintDefinition
+metadata:
+  name: datalogger-definition
+  namespace: default
+spec:
+  # Kind for data logger resources
+  kind: DataLogger
+  # Naming conventions
+  names:
+    singular: datalogger
+    plural: dataloggers
+  # Reconciliation handler
+  handler:
+    # Executor type that handles DataLogger blueprints
+    executorType: data-logger-reconciler
+    # Function to call for reconciliation
+    functionName: reconcile
+    # Reconcile every 60 seconds
+    reconcileInterval: 60

@@ -143,13 +143,16 @@ func (r *BlueprintReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 			}
 		} else {
-			// Update if spec changed
-			cosBp.ID = result.ID
-			cosBp.Metadata.Generation = result.Metadata.Generation + 1
-			result, err = coloniesClient.UpdateBlueprint(cosBp, executorPrvKey)
-			if err != nil {
-				log.Error(err, "Failed to update Blueprint in ColonyOS")
-				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+			// Only update if spec actually changed
+			if !specsEqual(specData, result.Spec) {
+				cosBp.ID = result.ID
+				cosBp.Metadata.Generation = result.Metadata.Generation + 1
+				result, err = coloniesClient.UpdateBlueprint(cosBp, executorPrvKey)
+				if err != nil {
+					log.Error(err, "Failed to update Blueprint in ColonyOS")
+					return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+				}
+				log.Info("Blueprint spec changed, updated in ColonyOS", "name", bp.Name)
 			}
 		}
 	}
@@ -206,6 +209,22 @@ func (r *BlueprintReconciler) getColoniesClient(ctx context.Context, namespace s
 	coloniesClient := client.CreateColoniesClient(host, port, insecure, false)
 
 	return coloniesClient, executorPrvKey, colonyName, nil
+}
+
+// specsEqual compares two specs using JSON serialization
+func specsEqual(a, b map[string]interface{}) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	aBytes, errA := json.Marshal(a)
+	bBytes, errB := json.Marshal(b)
+	if errA != nil || errB != nil {
+		return false
+	}
+	return string(aBytes) == string(bBytes)
 }
 
 // SetupWithManager sets up the controller with the Manager.

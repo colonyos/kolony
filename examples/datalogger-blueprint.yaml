@@ -1,0 +1,45 @@
+# DataLogger Blueprint Example
+#
+# Deploys a data logger device via the data-logger-reconciler.
+# The reconciler ensures the device configuration matches the desired state.
+#
+# Prerequisites:
+# 1. Create the colonyos-credentials secret in your namespace
+# 2. Apply the datalogger-definition.yaml first
+# 3. Have a data-logger-reconciler running
+#
+# Usage:
+#   kubectl apply -f datalogger-definition.yaml
+#   kubectl apply -f datalogger-blueprint.yaml
+#   kubectl get blueprints
+#   kubectl describe blueprint data-logger-1
+#
+# Update the version:
+#   kubectl patch blueprint data-logger-1 --type=merge -p '{"spec":{"data":{"appVersion":"3.0"}}}'
+#
+apiVersion: colony.colonyos.io/v1
+kind: Blueprint
+metadata:
+  name: data-logger-1
+  namespace: default
+spec:
+  # Must match the registered BlueprintDefinition kind
+  kind: DataLogger
+  # Location determines which reconciler handles this blueprint
+  locationName: server-room-a
+  # Data logger configuration (desired state)
+  data:
+    # Device identifier
+    name: data-logger-1
+    # Physical location of the device
+    location: Server Room A
+    # Application to run on the device
+    appName: DataCollector
+    # Application version
+    appVersion: "v6.0"
+    # Whether the device is enabled
+    enabled: true
+    # Log collection interval in seconds
+    logInterval: 5
+    # Log output format (json, csv, text)
+    logFormat: json
