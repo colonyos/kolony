@@ -42,6 +42,12 @@ spec:
             {{- end }}
             - --health-probe-bind-address=:{{ .Values.health.port }}
             - --metrics-bind-address=:{{ .Values.metrics.port }}
+            {{- with .Values.defaultCredentialsSecret }}
+            - --default-credentials-secret={{ . }}
+            {{- end }}
+            {{- with .Values.defaultCredentialsNamespaceSelector }}
+            - {{ printf "--default-credentials-namespace-selector=%s" . | quote }}
+            {{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           ports:

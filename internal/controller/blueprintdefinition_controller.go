@@ -18,16 +18,14 @@ package controller
 
 import (
 	"context"
+	"strings"
 	"time"
 
-	"github.com/colonyos/colonies/pkg/client"
 	"github.com/colonyos/colonies/pkg/core"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -42,7 +40,11 @@ const (
 	tlsEnabledValue              = "true"
 )
 
-// BlueprintDefinitionReconciler reconciles a BlueprintDefinition object
+// BlueprintDefinitionReconciler reconciles a BlueprintDefinition object.
+//
+// It only uses the colonyos-credentials Secret in the definition's own namespace, never the
+// default credentials Secret: definitions are colony-wide and need the colony key, so they
+// belong in namespaces an administrator has provisioned with credentials.
 type BlueprintDefinitionReconciler struct {
 	k8sclient.Client
 	Scheme *runtime.Scheme
@@ -65,27 +67,18 @@ func (r *BlueprintDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Get ColonyOS client and colony name
-	coloniesClient, colonyPrvKey, err := r.getColoniesClient(ctx, req.Namespace)
-	if err != nil {
-		log.Error(err, "Failed to create ColonyOS client")
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
-
-	colonyName, err := r.getColonyName(ctx, req.Namespace)
-	if err != nil {
-		log.Error(err, "Failed to get colony name")
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
+	resolver := &CredentialsResolver{Client: r.Client}
 
 	// Handle deletion
 	if !def.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(&def, blueprintDefinitionFinalizer) {
 			// Delete from ColonyOS
-			if def.Status.DefinitionID != "" {
-				if err := coloniesClient.RemoveBlueprintDefinition(colonyName, def.Name, colonyPrvKey); err != nil {
-					log.Error(err, "Failed to delete BlueprintDefinition from ColonyOS")
-				}
+			err := cleanupRemote(ctx, resolver, req.Namespace, def.Status.DefinitionID, func(c *Credentials) error {
+				return c.Client().RemoveBlueprintDefinition(c.ColonyName, def.Name, c.ColonyPrvKey)
+			})
+			if err != nil {
+				log.Error(err, "Failed to resolve ColonyOS credentials for deletion")
+				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 			}
 
 			// Remove finalizer
@@ -106,18 +99,15 @@ func (r *BlueprintDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Build ColonyOS BlueprintDefinition
-	// Args: name, group, version, kind, plural, scope, executorType, functionName
-	cosDef := core.CreateBlueprintDefinition(
-		def.Name,
-		"colony.colonyos.io",
-		"v1",
-		def.Spec.Kind,
-		def.Spec.Kind+"s",
-		colonyName,
-		def.Spec.Handler.ExecutorType,
-		def.Spec.Handler.FunctionName,
-	)
+	// Get ColonyOS client and credentials
+	creds, err := resolver.Resolve(ctx, req.Namespace)
+	if err != nil {
+		log.Error(err, "Failed to get ColonyOS credentials")
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+	coloniesClient, colonyPrvKey, colonyName := creds.Client(), creds.ColonyPrvKey, creds.ColonyName
+
+	cosDef := buildBlueprintDefinition(&def, colonyName)
 
 	var result *core.BlueprintDefinition
 	if def.Status.DefinitionID == "" {
@@ -172,37 +162,29 @@ func (r *BlueprintDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
 }
 
-func (r *BlueprintDefinitionReconciler) getColoniesClient(ctx context.Context, namespace string) (*client.ColoniesClient, string, error) {
-	var secret corev1.Secret
-	if err := r.Get(ctx, types.NamespacedName{
-		Name:      credentialsSecretName,
-		Namespace: namespace,
-	}, &secret); err != nil {
-		return nil, "", err
+// buildBlueprintDefinition converts a BlueprintDefinition CR into its ColonyOS form.
+func buildBlueprintDefinition(def *colonyv1.BlueprintDefinition, colonyName string) *core.BlueprintDefinition {
+	plural := def.Spec.Names.Plural
+	if plural == "" {
+		plural = strings.ToLower(def.Spec.Kind) + "s"
 	}
-
-	host := string(secret.Data["serverHost"])
-	port := parsePort(string(secret.Data["serverPort"]))
-	tls := string(secret.Data["tls"]) == tlsEnabledValue
-	colonyPrvKey := string(secret.Data["colonyPrvKey"])
-
-	// CreateColoniesClient(host, port, insecure, skipTLSVerify)
-	// insecure=true means HTTP, insecure=false means HTTPS
-	insecure := !tls
-	coloniesClient := client.CreateColoniesClient(host, port, insecure, false)
-
-	return coloniesClient, colonyPrvKey, nil
-}
-
-func (r *BlueprintDefinitionReconciler) getColonyName(ctx context.Context, namespace string) (string, error) {
-	var secret corev1.Secret
-	if err := r.Get(ctx, types.NamespacedName{
-		Name:      credentialsSecretName,
-		Namespace: namespace,
-	}, &secret); err != nil {
-		return "", err
+	// Args: name, group, version, kind, plural, scope, executorType, functionName
+	cosDef := core.CreateBlueprintDefinition(
+		def.Name,
+		"colony.colonyos.io",
+		"v1",
+		def.Spec.Kind,
+		plural,
+		"Namespaced",
+		def.Spec.Handler.ExecutorType,
+		def.Spec.Handler.FunctionName,
+	)
+	// The server checks colony ownership against the metadata, which the constructor leaves empty.
+	cosDef.Metadata.ColonyName = colonyName
+	if def.Spec.Names.Singular != "" {
+		cosDef.Spec.Names.Singular = def.Spec.Names.Singular
 	}
-	return string(secret.Data["colonyName"]), nil
+	return cosDef
 }
 
 func parsePort(s string) int {

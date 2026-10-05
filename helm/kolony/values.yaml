@@ -42,6 +42,15 @@ tolerations: []
 
 affinity: {}
 
+# ColonyOS credentials Secret ("<namespace>/<name>") used for Blueprints and ColonyProcesses in
+# namespaces that have no colonyos-credentials Secret of their own, e.g. namespaces that a tool
+# creates per request. BlueprintDefinitions always need their own, so this Secret needs no
+# colonyPrvKey. Leave empty to require a Secret in every namespace.
+defaultCredentialsSecret: ""
+# Label selector limiting defaultCredentialsSecret to matching namespaces, e.g. a label set by
+# the tool that creates them. Leave empty to allow every namespace.
+defaultCredentialsNamespaceSelector: ""
+
 # Leader election configuration
 leaderElection:
   enabled: true

@@ -3,7 +3,7 @@ module github.com/colonyos/kolony
 go 1.24.6
 
 require (
-	github.com/colonyos/colonies v1.9.7
+	github.com/colonyos/colonies v1.9.10
 	github.com/go-logr/logr v1.4.3
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1

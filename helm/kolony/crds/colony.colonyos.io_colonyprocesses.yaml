@@ -85,6 +85,16 @@ spec:
                   nodes:
                     description: Nodes is the number of nodes required
                     type: integer
+                  processesPerNode:
+                    default: 1
+                    description: ProcessesPerNode is the number of processes per node
+                      (required by container-executor)
+                    type: integer
+                  wallTime:
+                    description: WallTime is the maximum wall clock time in seconds
+                      (required by container-executor)
+                    format: int64
+                    type: integer
                 type: object
               env:
                 additionalProperties:

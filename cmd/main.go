@@ -61,6 +61,8 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var defaultCredentialsSecret string
+	var defaultCredentialsNamespaceSelector string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -77,6 +79,13 @@ func main() {
 		"The directory that contains the metrics server certificate.")
 	flag.StringVar(&metricsCertName, "metrics-cert-name", "tls.crt", "The name of the metrics server certificate file.")
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
+	flag.StringVar(&defaultCredentialsSecret, "default-credentials-secret", "",
+		"Namespace/name of a ColonyOS credentials Secret to use for Blueprints and ColonyProcesses in namespaces "+
+			"that have no colonyos-credentials Secret of their own. BlueprintDefinitions always need their own. "+
+			"Leave empty to require one per namespace.")
+	flag.StringVar(&defaultCredentialsNamespaceSelector, "default-credentials-namespace-selector", "",
+		"Label selector limiting --default-credentials-secret to matching namespaces, "+
+			"e.g. a label set by the tool that creates those namespaces. Leave empty to allow every namespace.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	opts := zap.Options{
@@ -178,6 +187,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	credentials, err := controller.NewCredentialsResolver(mgr.GetClient(),
+		defaultCredentialsSecret, defaultCredentialsNamespaceSelector)
+	if err != nil {
+		setupLog.Error(err, "invalid default credentials settings")
+		os.Exit(1)
+	}
+	if credentials.Default != nil {
+		setupLog.Info("Using default ColonyOS credentials Secret", "secret", credentials.Default,
+			"namespaceSelector", defaultCredentialsNamespaceSelector)
+	}
+
 	if err := (&controller.BlueprintDefinitionReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -186,15 +206,17 @@ func main() {
 		os.Exit(1)
 	}
 	if err := (&controller.BlueprintReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Credentials: credentials,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Blueprint")
 		os.Exit(1)
 	}
 	if err := (&controller.ColonyProcessReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Credentials: credentials,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ColonyProcess")
 		os.Exit(1)

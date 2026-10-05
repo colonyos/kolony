@@ -21,14 +21,11 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/colonyos/colonies/pkg/client"
 	"github.com/colonyos/colonies/pkg/core"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -44,7 +41,8 @@ const (
 // BlueprintReconciler reconciles a Blueprint object
 type BlueprintReconciler struct {
 	k8sclient.Client
-	Scheme *runtime.Scheme
+	Scheme      *runtime.Scheme
+	Credentials *CredentialsResolver
 }
 
 // +kubebuilder:rbac:groups=colony.colonyos.io,resources=blueprints,verbs=get;list;watch;create;update;patch;delete
@@ -64,21 +62,18 @@ func (r *BlueprintReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	// Get ColonyOS client and credentials
-	coloniesClient, executorPrvKey, colonyName, err := r.getColoniesClient(ctx, req.Namespace)
-	if err != nil {
-		log.Error(err, "Failed to create ColonyOS client")
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
+	resolver := credentialsResolver(r.Credentials, r.Client)
 
 	// Handle deletion
 	if !bp.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(&bp, blueprintFinalizer) {
 			// Delete from ColonyOS
-			if bp.Status.BlueprintID != "" {
-				if err := coloniesClient.RemoveBlueprint(colonyName, bp.Name, executorPrvKey); err != nil {
-					log.Error(err, "Failed to delete Blueprint from ColonyOS")
-				}
+			err := cleanupRemote(ctx, resolver, req.Namespace, bp.Status.BlueprintID, func(c *Credentials) error {
+				return c.Client().RemoveBlueprint(c.ColonyName, bp.Name, c.ExecutorPrvKey)
+			})
+			if err != nil {
+				log.Error(err, "Failed to resolve ColonyOS credentials for deletion")
+				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 			}
 
 			// Remove finalizer
@@ -98,6 +93,14 @@ func (r *BlueprintReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
+
+	// Get ColonyOS client and credentials
+	creds, err := resolver.Resolve(ctx, req.Namespace)
+	if err != nil {
+		log.Error(err, "Failed to get ColonyOS credentials")
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+	coloniesClient, executorPrvKey, colonyName := creds.Client(), creds.ExecutorPrvKey, creds.ColonyName
 
 	// Parse spec data
 	var specData map[string]interface{}
@@ -186,29 +189,6 @@ func (r *BlueprintReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	log.Info("Reconciled Blueprint", "name", bp.Name, "blueprintId", result.ID, "generation", result.Metadata.Generation)
 	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
-}
-
-func (r *BlueprintReconciler) getColoniesClient(ctx context.Context, namespace string) (*client.ColoniesClient, string, string, error) {
-	var secret corev1.Secret
-	if err := r.Get(ctx, types.NamespacedName{
-		Name:      credentialsSecretName,
-		Namespace: namespace,
-	}, &secret); err != nil {
-		return nil, "", "", err
-	}
-
-	host := string(secret.Data["serverHost"])
-	port := parsePort(string(secret.Data["serverPort"]))
-	tls := string(secret.Data["tls"]) == tlsEnabledValue
-	executorPrvKey := string(secret.Data["executorPrvKey"])
-	colonyName := string(secret.Data["colonyName"])
-
-	// CreateColoniesClient(host, port, insecure, skipTLSVerify)
-	// insecure=true means HTTP, insecure=false means HTTPS
-	insecure := !tls
-	coloniesClient := client.CreateColoniesClient(host, port, insecure, false)
-
-	return coloniesClient, executorPrvKey, colonyName, nil
 }
 
 // specsEqual compares two specs using JSON serialization

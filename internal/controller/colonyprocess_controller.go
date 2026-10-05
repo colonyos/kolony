@@ -25,12 +25,10 @@ import (
 	"github.com/colonyos/colonies/pkg/client"
 	"github.com/colonyos/colonies/pkg/core"
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -46,7 +44,8 @@ const (
 // ColonyProcessReconciler reconciles a ColonyProcess object
 type ColonyProcessReconciler struct {
 	k8sclient.Client
-	Scheme *runtime.Scheme
+	Scheme      *runtime.Scheme
+	Credentials *CredentialsResolver
 }
 
 // +kubebuilder:rbac:groups=colony.colonyos.io,resources=colonyprocesses,verbs=get;list;watch;create;update;patch;delete
@@ -66,21 +65,22 @@ func (r *ColonyProcessReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	// Get ColonyOS client and credentials
-	coloniesClient, executorPrvKey, colonyName, err := r.getColoniesClient(ctx, req.Namespace)
-	if err != nil {
-		log.Error(err, "Failed to create ColonyOS client")
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
+	resolver := credentialsResolver(r.Credentials, r.Client)
 
 	// Handle deletion
 	if !proc.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(&proc, processFinalizer) {
 			// Cancel process if running
-			if proc.Status.ProcessID != "" && !isTerminalState(proc.Status.State) {
-				if err := coloniesClient.Fail(proc.Status.ProcessID, []string{"Cancelled by Kubernetes"}, executorPrvKey); err != nil {
-					log.Error(err, "Failed to cancel process in ColonyOS")
-				}
+			runningID := ""
+			if !isTerminalState(proc.Status.State) {
+				runningID = proc.Status.ProcessID
+			}
+			err := cleanupRemote(ctx, resolver, req.Namespace, runningID, func(c *Credentials) error {
+				return c.Client().Fail(runningID, []string{"Cancelled by Kubernetes"}, c.ExecutorPrvKey)
+			})
+			if err != nil {
+				log.Error(err, "Failed to resolve ColonyOS credentials for deletion")
+				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 			}
 
 			// Remove finalizer
@@ -105,6 +105,14 @@ func (r *ColonyProcessReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if isTerminalState(proc.Status.State) {
 		return ctrl.Result{}, nil
 	}
+
+	// Get ColonyOS client and credentials
+	creds, err := resolver.Resolve(ctx, req.Namespace)
+	if err != nil {
+		log.Error(err, "Failed to get ColonyOS credentials")
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+	coloniesClient, executorPrvKey, colonyName := creds.Client(), creds.ExecutorPrvKey, creds.ColonyName
 
 	// If not submitted yet, submit to ColonyOS
 	if proc.Status.ProcessID == "" {
@@ -337,29 +345,6 @@ func (r *ColonyProcessReconciler) pollProcessStatus(ctx context.Context, proc *c
 
 func isTerminalState(state colonyv1.ProcessState) bool {
 	return state == colonyv1.ProcessStateSuccess || state == colonyv1.ProcessStateFailed
-}
-
-func (r *ColonyProcessReconciler) getColoniesClient(ctx context.Context, namespace string) (*client.ColoniesClient, string, string, error) {
-	var secret corev1.Secret
-	if err := r.Get(ctx, types.NamespacedName{
-		Name:      credentialsSecretName,
-		Namespace: namespace,
-	}, &secret); err != nil {
-		return nil, "", "", err
-	}
-
-	host := string(secret.Data["serverHost"])
-	port := parsePort(string(secret.Data["serverPort"]))
-	tls := string(secret.Data["tls"]) == tlsEnabledValue
-	executorPrvKey := string(secret.Data["executorPrvKey"])
-	colonyName := string(secret.Data["colonyName"])
-
-	// CreateColoniesClient(host, port, insecure, skipTLSVerify)
-	// insecure=true means HTTP, insecure=false means HTTPS
-	insecure := !tls
-	coloniesClient := client.CreateColoniesClient(host, port, insecure, false)
-
-	return coloniesClient, executorPrvKey, colonyName, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -225,6 +225,18 @@ stringData:
 
 **Important:** Never commit credentials to version control. Use sealed-secrets or external secret management in production.
 
+### Default Credentials
+
+Some tools create resources in namespaces they generate on the fly, for example a fresh namespace per request or per tenant, and cannot place a credentials Secret there first. For these, point the operator at one shared Secret with `--default-credentials-secret=<namespace>/<name>`, or the Helm value `defaultCredentialsSecret`. A `colonyos-credentials` Secret in the resource's own namespace still takes precedence.
+
+The default Secret is used for Blueprints and ColonyProcesses only. BlueprintDefinitions are colony-wide and need the colony key, so they always need a `colonyos-credentials` Secret in their own namespace. The default Secret therefore needs no `colonyPrvKey`; leave it out so that the fallback cannot act as the colony owner.
+
+Unless narrowed as described below, the default Secret applies to every namespace: anyone who can create a Blueprint or ColonyProcess in any namespace then acts with its executor key. Only enable it where that is acceptable, and restrict who can create these resources with RBAC.
+
+To narrow the fallback, set `--default-credentials-namespace-selector` (Helm value `defaultCredentialsNamespaceSelector`) to a label selector. Only namespaces whose labels match it then fall back to the default Secret. Creating or labelling a namespace needs cluster-level rights, so this keeps the default Secret out of namespaces that ordinary users control. If the tool that creates the namespaces labels them, select on that label, for example `--default-credentials-namespace-selector=example.com/provisioned`.
+
+When a resource is deleted and no credentials can be found for it at all, the operator logs an error and removes the finalizer anyway. This stops the namespace from hanging in `Terminating`, but the object is left behind in ColonyOS.
+
 ## Examples
 
 The `examples/` directory contains ready-to-use YAML files:
@@ -305,6 +317,11 @@ metrics:
 
 health:
   port: 8081
+
+# "<namespace>/<name>" of a fallback credentials Secret, see Default Credentials
+defaultCredentialsSecret: ""
+# Label selector limiting that Secret to matching namespaces
+defaultCredentialsNamespaceSelector: ""
 ```
 
 ## Uninstallation
